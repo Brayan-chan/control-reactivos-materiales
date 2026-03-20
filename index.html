@@ -898,11 +898,25 @@
           }
         });
 
-        // También cada ítem del dropdown (opcional: hacer algo)
+        // Manejador para cada ítem del dropdown
         const dropdownItems = dropdownMenu.querySelectorAll('.dropdown-item');
         dropdownItems.forEach(item => {
           item.addEventListener('click', function() {
-            console.log('Filtro seleccionado:', this.innerText.trim());
+            const text = this.innerText.trim();
+            
+            // Determinar qué filtro se seleccionó basado en el texto o emoji
+            if (text.includes('Todos')) {
+              currentFilter = 'todos';
+            } else if (text.includes('Reactivos')) {
+              currentFilter = 'reactivos';
+            } else if (text.includes('Materiales')) {
+              currentFilter = 'materiales';
+            } else if (text.includes('Disponible')) {
+              currentFilter = 'disponible';
+            }
+            
+            // Re-aplicar búsqueda/filtros y cerrar dropdown
+            applySearch();
             dropdownMenu.classList.remove('show');
           });
         });
@@ -935,6 +949,7 @@
       let selectedRegisterType = 'material';
       let inventoryItems = [];
       let currentSearchText = '';
+      let currentFilter = 'todos'; // 'todos', 'reactivos', 'materiales', 'disponible'
       let pendingDeleteRow = null;
       let pendingDeleteItemName = '';
       let pendingDeleteItemId = '';
@@ -1075,16 +1090,27 @@
 
       function applySearch() {
         const query = currentSearchText.trim().toLowerCase();
-        if (!query) {
-          renderInventoryTable(inventoryItems);
-          return;
+        
+        let filtered = inventoryItems;
+
+        // Aplicar filtro de búsqueda
+        if (query) {
+          filtered = filtered.filter(item => {
+            return item.nombre.toLowerCase().includes(query)
+              || item.categoria.toLowerCase().includes(query)
+              || formatQuantityText(item.cantidad, item.unidad).toLowerCase().includes(query);
+          });
         }
 
-        const filtered = inventoryItems.filter(item => {
-          return item.nombre.toLowerCase().includes(query)
-            || item.categoria.toLowerCase().includes(query)
-            || formatQuantityText(item.cantidad, item.unidad).toLowerCase().includes(query);
-        });
+        // Aplicar filtro de categoría/estado
+        if (currentFilter === 'reactivos') {
+          filtered = filtered.filter(item => item.categoria.toLowerCase().includes('reactivo'));
+        } else if (currentFilter === 'materiales') {
+          filtered = filtered.filter(item => !item.categoria.toLowerCase().includes('reactivo'));
+        } else if (currentFilter === 'disponible') {
+          filtered = filtered.filter(item => item.cantidad > 0);
+        }
+        // Si currentFilter === 'todos', se muestran todos los filtrados por búsqueda
 
         renderInventoryTable(filtered);
       }
