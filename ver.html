@@ -702,6 +702,25 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="supplyModalOverlay" role="dialog" aria-modal="true" aria-labelledby="supplyModalTitle">
+    <div class="modal-card">
+      <div class="modal-header" id="supplyModalTitle">Abastecer Material</div>
+      <div class="modal-body">
+        <p id="supplyAvailable">Cantidad Disponible: 0 Unidades</p>
+        <label for="supplyInput" id="supplyInputLabel">Ingrese la Cantidad de Material:</label>
+        <div class="consume-input-row">
+          <input class="consume-input" id="supplyInput" type="text" inputmode="decimal" placeholder="Ingrese una cantidad">
+          <span id="supplyUnitText">Unidades</span>
+        </div>
+        <p class="consume-error" id="supplyError"></p>
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-primary" id="supplyAcceptBtn">Aceptar</button>
+          <button class="modal-btn modal-btn-secondary" id="supplyCancelBtn">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     (function() {
       const itemTitle = document.getElementById('itemTitle');
@@ -718,6 +737,15 @@
       const consumeModalTitle = document.getElementById('consumeModalTitle');
       const consumeAcceptBtn = document.getElementById('consumeAcceptBtn');
       const consumeCancelBtn = document.getElementById('consumeCancelBtn');
+      const supplyModalOverlay = document.getElementById('supplyModalOverlay');
+      const supplyAvailable = document.getElementById('supplyAvailable');
+      const supplyInput = document.getElementById('supplyInput');
+      const supplyInputLabel = document.getElementById('supplyInputLabel');
+      const supplyError = document.getElementById('supplyError');
+      const supplyUnitText = document.getElementById('supplyUnitText');
+      const supplyModalTitle = document.getElementById('supplyModalTitle');
+      const supplyAcceptBtn = document.getElementById('supplyAcceptBtn');
+      const supplyCancelBtn = document.getElementById('supplyCancelBtn');
 
       const params = new URLSearchParams(window.location.search);
       const nombre = params.get('nombre') || (itemTitle ? itemTitle.innerText : 'Material/Reactivo');
@@ -853,6 +881,41 @@
         consumeModalOverlay.classList.remove('show');
       }
 
+      function showSupplyError(message) {
+        if (!supplyError) return;
+        supplyError.innerText = message;
+      }
+
+      function openSupplyModal() {
+        if (!supplyModalOverlay) return;
+        if (supplyModalTitle) {
+          supplyModalTitle.innerText = `Abastecer ${currentItemType}`;
+        }
+        if (supplyAvailable) {
+          supplyAvailable.innerText = `Cantidad Disponible: ${formatQuantityText(currentQuantityValue, currentQuantityUnit)}`;
+        }
+        if (supplyUnitText) {
+          supplyUnitText.innerText = currentQuantityUnit;
+        }
+        if (supplyInputLabel) {
+          supplyInputLabel.innerText = `Ingrese la Cantidad de ${currentItemType}:`;
+        }
+        if (supplyInput) {
+          supplyInput.value = '';
+          supplyInput.placeholder = currentItemType === 'Reactivo' ? 'Ingrese una cantidad en volumen' : 'Ingrese una cantidad';
+        }
+        showSupplyError('');
+        supplyModalOverlay.classList.add('show');
+        if (supplyInput) {
+          supplyInput.focus();
+        }
+      }
+
+      function closeSupplyModal() {
+        if (!supplyModalOverlay) return;
+        supplyModalOverlay.classList.remove('show');
+      }
+
       if (itemTitle) itemTitle.innerText = nombre;
       if (itemCategoria) itemCategoria.innerText = categoria;
       if (itemEstado) itemEstado.innerText = estado;
@@ -893,7 +956,7 @@
       }
       if (abastecerBtn) {
         abastecerBtn.addEventListener('click', function() {
-          console.log('Abastecer');
+          openSupplyModal();
         });
       }
 
@@ -948,7 +1011,58 @@
         });
       }
 
+      if (supplyCancelBtn) {
+        supplyCancelBtn.addEventListener('click', function() {
+          closeSupplyModal();
+        });
+      }
+
+      if (supplyAcceptBtn) {
+        supplyAcceptBtn.addEventListener('click', function() {
+          const rawInput = supplyInput ? supplyInput.value.trim() : '';
+          const amountToSupply = Number(rawInput.replace(',', '.'));
+
+          if (!Number.isFinite(amountToSupply) || amountToSupply <= 0) {
+            showSupplyError('*Aviso: Ingrese una cantidad valida');
+            return;
+          }
+
+          currentQuantityValue = Number((currentQuantityValue + amountToSupply).toFixed(2));
+          if (itemCantidad) {
+            itemCantidad.innerText = formatQuantityText(currentQuantityValue, currentQuantityUnit);
+          }
+
+          if (!movementHistoryByItem[nombre]) {
+            movementHistoryByItem[nombre] = [];
+          }
+
+          movementHistoryByItem[nombre].unshift({
+            movimiento: 'Abastecimiento',
+            cantidad: formatQuantityText(amountToSupply, currentQuantityUnit),
+            fecha: getTodayDate(),
+            responsable: 'Coordinador',
+            laboratorio: 'No aplica'
+          });
+
+          renderHistory(nombre);
+          closeSupplyModal();
+        });
+      }
+
+      if (supplyModalOverlay) {
+        supplyModalOverlay.addEventListener('click', function(event) {
+          if (event.target === supplyModalOverlay) {
+            closeSupplyModal();
+          }
+        });
+      }
+
       document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && supplyModalOverlay && supplyModalOverlay.classList.contains('show')) {
+          closeSupplyModal();
+          return;
+        }
+
         if (event.key === 'Escape' && consumeModalOverlay && consumeModalOverlay.classList.contains('show')) {
           closeConsumeModal();
         }
