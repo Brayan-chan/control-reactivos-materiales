@@ -688,7 +688,7 @@
       <div class="modal-header" id="consumeModalTitle">Registrar Consumo de Material</div>
       <div class="modal-body">
         <p id="consumeAvailable">Cantidad Disponible: 0 Unidades</p>
-        <label for="consumeInput">Cantidad a Consumir</label>
+        <label for="consumeInput" id="consumeInputLabel">Cantidad a Consumir</label>
         <div class="consume-input-row">
           <input class="consume-input" id="consumeInput" type="text" inputmode="decimal" placeholder="Ingrese una cantidad">
           <span id="consumeUnitText">Unidades</span>
@@ -712,8 +712,10 @@
       const consumeModalOverlay = document.getElementById('consumeModalOverlay');
       const consumeAvailable = document.getElementById('consumeAvailable');
       const consumeInput = document.getElementById('consumeInput');
+      const consumeInputLabel = document.getElementById('consumeInputLabel');
       const consumeError = document.getElementById('consumeError');
       const consumeUnitText = document.getElementById('consumeUnitText');
+      const consumeModalTitle = document.getElementById('consumeModalTitle');
       const consumeAcceptBtn = document.getElementById('consumeAcceptBtn');
       const consumeCancelBtn = document.getElementById('consumeCancelBtn');
 
@@ -779,6 +781,16 @@
       let currentQuantityValue = initialQuantityData.value;
       let currentQuantityUnit = initialQuantityData.unit;
 
+      function resolveItemType(categoryText, unitText) {
+        const category = (categoryText || '').toLowerCase();
+        const unit = (unitText || '').toLowerCase();
+        const isReactivoByCategory = category.includes('reactivo');
+        const isReactivoByUnit = unit.includes('ml') || unit === 'l';
+        return (isReactivoByCategory || isReactivoByUnit) ? 'Reactivo' : 'Material';
+      }
+
+      const currentItemType = resolveItemType(categoria, currentQuantityUnit);
+
       function renderHistory(itemName) {
         if (!historyBody) return;
 
@@ -811,14 +823,23 @@
 
       function openConsumeModal() {
         if (!consumeModalOverlay) return;
+        if (consumeModalTitle) {
+          consumeModalTitle.innerText = `Registrar Consumo de ${currentItemType}`;
+        }
         if (consumeAvailable) {
           consumeAvailable.innerText = `Cantidad Disponible: ${formatQuantityText(currentQuantityValue, currentQuantityUnit)}`;
         }
         if (consumeUnitText) {
           consumeUnitText.innerText = currentQuantityUnit;
         }
+        if (consumeInputLabel) {
+          consumeInputLabel.innerText = currentItemType === 'Reactivo'
+            ? `Cantidad a Consumir (${currentQuantityUnit})`
+            : 'Cantidad a Consumir';
+        }
         if (consumeInput) {
           consumeInput.value = '';
+          consumeInput.placeholder = currentItemType === 'Reactivo' ? 'Ingrese una cantidad en volumen' : 'Ingrese una cantidad';
         }
         showConsumeError('');
         consumeModalOverlay.classList.add('show');
