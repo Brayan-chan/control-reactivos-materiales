@@ -309,6 +309,114 @@
       background-color: #3d9c44;
     }
 
+    /* ---------- MODAL: REGISTRAR CONSUMO ---------- */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 500px;
+      background: #ffffff;
+      border: 1px solid #dbe2ec;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 20px 30px rgba(15, 23, 42, 0.2);
+    }
+
+    .modal-header {
+      background: #2a3b63;
+      color: #ffffff;
+      font-size: 1.05rem;
+      font-weight: 600;
+      text-align: center;
+      padding: 16px;
+    }
+
+    .modal-body {
+      padding: 18px 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      color: #1f2937;
+      font-size: 0.95rem;
+    }
+
+    .consume-input-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .consume-input {
+      width: 190px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 1rem;
+      color: #334155;
+      outline: none;
+    }
+
+    .consume-input:focus {
+      border-color: #7a9cd8;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+
+    .consume-error {
+      color: #c95f57;
+      font-weight: 600;
+      min-height: 20px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 4px;
+    }
+
+    .modal-btn {
+      min-width: 140px;
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 1.05rem;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .modal-btn-primary {
+      background: #3676c6;
+      color: #ffffff;
+    }
+
+    .modal-btn-primary:hover {
+      background: #2f66aa;
+    }
+
+    .modal-btn-secondary {
+      background: #eef2f7;
+      border-color: #93a2b8;
+      color: #1f2937;
+    }
+
+    .modal-btn-secondary:hover {
+      background: #e5eaf2;
+    }
+
     /* ---------- HISTORIAL DE MOVIMIENTOS (tabla) ---------- */
     .history-card {
       background-color: var(--white);
@@ -575,6 +683,25 @@
     </div>
   </main>
 
+  <div class="modal-overlay" id="consumeModalOverlay" role="dialog" aria-modal="true" aria-labelledby="consumeModalTitle">
+    <div class="modal-card">
+      <div class="modal-header" id="consumeModalTitle">Registrar Consumo de Material</div>
+      <div class="modal-body">
+        <p id="consumeAvailable">Cantidad Disponible: 0 Unidades</p>
+        <label for="consumeInput">Cantidad a Consumir</label>
+        <div class="consume-input-row">
+          <input class="consume-input" id="consumeInput" type="text" inputmode="decimal" placeholder="Ingrese una cantidad">
+          <span id="consumeUnitText">Unidades</span>
+        </div>
+        <p class="consume-error" id="consumeError"></p>
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-primary" id="consumeAcceptBtn">Aceptar</button>
+          <button class="modal-btn modal-btn-secondary" id="consumeCancelBtn">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     (function() {
       const itemTitle = document.getElementById('itemTitle');
@@ -582,6 +709,13 @@
       const itemEstado = document.getElementById('itemEstado');
       const itemCantidad = document.getElementById('itemCantidad');
       const historyBody = document.getElementById('historyBody');
+      const consumeModalOverlay = document.getElementById('consumeModalOverlay');
+      const consumeAvailable = document.getElementById('consumeAvailable');
+      const consumeInput = document.getElementById('consumeInput');
+      const consumeError = document.getElementById('consumeError');
+      const consumeUnitText = document.getElementById('consumeUnitText');
+      const consumeAcceptBtn = document.getElementById('consumeAcceptBtn');
+      const consumeCancelBtn = document.getElementById('consumeCancelBtn');
 
       const params = new URLSearchParams(window.location.search);
       const nombre = params.get('nombre') || (itemTitle ? itemTitle.innerText : 'Material/Reactivo');
@@ -590,6 +724,11 @@
       const cantidad = params.get('cantidad') || (itemCantidad ? itemCantidad.innerText : 'Sin cantidad');
 
       const movementHistoryByItem = {
+        'Hisopo': [
+          { movimiento: 'Consumo', cantidad: '2 Unidades', fecha: '16/03/2026', responsable: 'Coordinador', laboratorio: 'No aplica' },
+          { movimiento: 'Abastecimiento', cantidad: '10 Unidades', fecha: '14/03/2026', responsable: 'Coordinador', laboratorio: 'No aplica' },
+          { movimiento: 'Asignación', cantidad: '3 Unidades', fecha: '12/03/2026', responsable: 'Coordinador', laboratorio: 'Microbiología' }
+        ],
         'Hisopos': [
           { movimiento: 'Consumo', cantidad: '2 Unidades', fecha: '16/03/2026', responsable: 'Coordinador', laboratorio: 'No aplica' },
           { movimiento: 'Abastecimiento', cantidad: '10 Unidades', fecha: '14/03/2026', responsable: 'Coordinador', laboratorio: 'No aplica' },
@@ -606,6 +745,39 @@
           { movimiento: 'Asignación', cantidad: '25 ml', fecha: '10/03/2026', responsable: 'Coordinador', laboratorio: 'Bioquímica' }
         ]
       };
+
+      function parseQuantityData(text) {
+        const source = (text || '').trim();
+        const numberMatch = source.match(/[\d.,]+/);
+        const rawNumber = numberMatch ? numberMatch[0].replace(',', '.') : '0';
+        const value = Number(rawNumber);
+        const unit = source.replace(/[\d.,]+/g, '').trim() || 'Unidades';
+
+        return {
+          value: Number.isFinite(value) ? value : 0,
+          unit
+        };
+      }
+
+      function formatAmount(value) {
+        return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+      }
+
+      function formatQuantityText(value, unit) {
+        return `${formatAmount(value)} ${unit}`.trim();
+      }
+
+      function getTodayDate() {
+        const now = new Date();
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = now.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
+
+      const initialQuantityData = parseQuantityData(cantidad);
+      let currentQuantityValue = initialQuantityData.value;
+      let currentQuantityUnit = initialQuantityData.unit;
 
       function renderHistory(itemName) {
         if (!historyBody) return;
@@ -632,10 +804,38 @@
         `).join('');
       }
 
+      function showConsumeError(message) {
+        if (!consumeError) return;
+        consumeError.innerText = message;
+      }
+
+      function openConsumeModal() {
+        if (!consumeModalOverlay) return;
+        if (consumeAvailable) {
+          consumeAvailable.innerText = `Cantidad Disponible: ${formatQuantityText(currentQuantityValue, currentQuantityUnit)}`;
+        }
+        if (consumeUnitText) {
+          consumeUnitText.innerText = currentQuantityUnit;
+        }
+        if (consumeInput) {
+          consumeInput.value = '';
+        }
+        showConsumeError('');
+        consumeModalOverlay.classList.add('show');
+        if (consumeInput) {
+          consumeInput.focus();
+        }
+      }
+
+      function closeConsumeModal() {
+        if (!consumeModalOverlay) return;
+        consumeModalOverlay.classList.remove('show');
+      }
+
       if (itemTitle) itemTitle.innerText = nombre;
       if (itemCategoria) itemCategoria.innerText = categoria;
       if (itemEstado) itemEstado.innerText = estado;
-      if (itemCantidad) itemCantidad.innerText = cantidad;
+      if (itemCantidad) itemCantidad.innerText = formatQuantityText(currentQuantityValue, currentQuantityUnit);
       renderHistory(nombre);
 
       document.title = `LabInventory · Detalle de ${nombre}`;
@@ -662,7 +862,7 @@
 
       if (consumirBtn) {
         consumirBtn.addEventListener('click', function() {
-          console.log('Consumir');
+          openConsumeModal();
         });
       }
       if (asignarBtn) {
@@ -675,6 +875,63 @@
           console.log('Abastecer');
         });
       }
+
+      if (consumeCancelBtn) {
+        consumeCancelBtn.addEventListener('click', function() {
+          closeConsumeModal();
+        });
+      }
+
+      if (consumeAcceptBtn) {
+        consumeAcceptBtn.addEventListener('click', function() {
+          const rawInput = consumeInput ? consumeInput.value.trim() : '';
+          const amountToConsume = Number(rawInput.replace(',', '.'));
+
+          if (!Number.isFinite(amountToConsume) || amountToConsume <= 0) {
+            showConsumeError('*Aviso: Ingrese una cantidad valida');
+            return;
+          }
+
+          if (amountToConsume > currentQuantityValue) {
+            showConsumeError('*Aviso: Cantidad insuficiente');
+            return;
+          }
+
+          currentQuantityValue = Number((currentQuantityValue - amountToConsume).toFixed(2));
+          if (itemCantidad) {
+            itemCantidad.innerText = formatQuantityText(currentQuantityValue, currentQuantityUnit);
+          }
+
+          if (!movementHistoryByItem[nombre]) {
+            movementHistoryByItem[nombre] = [];
+          }
+
+          movementHistoryByItem[nombre].unshift({
+            movimiento: 'Consumo',
+            cantidad: formatQuantityText(amountToConsume, currentQuantityUnit),
+            fecha: getTodayDate(),
+            responsable: 'Coordinador',
+            laboratorio: 'No aplica'
+          });
+
+          renderHistory(nombre);
+          closeConsumeModal();
+        });
+      }
+
+      if (consumeModalOverlay) {
+        consumeModalOverlay.addEventListener('click', function(event) {
+          if (event.target === consumeModalOverlay) {
+            closeConsumeModal();
+          }
+        });
+      }
+
+      document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && consumeModalOverlay && consumeModalOverlay.classList.contains('show')) {
+          closeConsumeModal();
+        }
+      });
 
       console.log(`Vista de detalle cargada para "${nombre}"`);
     })();
