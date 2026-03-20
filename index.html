@@ -523,6 +523,117 @@
       background: #e8edf4;
     }
 
+    /* ---------- MODAL ELIMINAR ---------- */
+    .delete-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1001;
+      padding: 16px;
+    }
+
+    .delete-modal-overlay.show {
+      display: flex;
+    }
+
+    .delete-modal-card {
+      width: 100%;
+      max-width: 500px;
+      background: #ffffff;
+      border: 1px solid #dbe2ec;
+      border-radius: 3px;
+      overflow: hidden;
+      box-shadow: 0 20px 30px rgba(15, 23, 42, 0.2);
+    }
+
+    .delete-modal-header {
+      background: #2f3f66;
+      color: #ffffff;
+      font-size: 2rem;
+      font-weight: 500;
+      text-align: center;
+      padding: 16px;
+    }
+
+    .delete-modal-body {
+      padding: 18px 24px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 1rem;
+      color: #111827;
+      background: #ffffff;
+    }
+
+    .delete-input-row {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .delete-reason-input {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 0.98rem;
+      color: #334155;
+      outline: none;
+    }
+
+    .delete-reason-input:focus {
+      border-color: #7a9cd8;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+
+    .delete-modal-error {
+      min-height: 20px;
+      color: #c95f57;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .delete-modal-actions {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      padding: 8px 24px 20px;
+      background: #ffffff;
+    }
+
+    .delete-modal-btn {
+      min-width: 140px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      padding: 10px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .delete-modal-btn.primary {
+      background: #3676c6;
+      color: #ffffff;
+    }
+
+    .delete-modal-btn.primary:hover {
+      background: #2f66aa;
+    }
+
+    .delete-modal-btn.secondary {
+      background: #f3f5f9;
+      color: #1f2937;
+      border-color: #93a2b8;
+    }
+
+    .delete-modal-btn.secondary:hover {
+      background: #e8edf4;
+    }
+
     /* Responsive colapsable sidebar (pantallas < 800px) */
     @media (max-width: 780px) {
       .sidebar {
@@ -576,6 +687,14 @@
       .add-field input,
       .add-modal-btn {
         font-size: 1rem;
+      }
+
+      .delete-modal-header {
+        font-size: 1.5rem;
+      }
+
+      .delete-input-row {
+        grid-template-columns: 1fr;
       }
     }
 
@@ -767,6 +886,23 @@
     </div>
   </div>
 
+  <div class="delete-modal-overlay" id="deleteModalOverlay" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+    <div class="delete-modal-card">
+      <div class="delete-modal-header" id="deleteModalTitle">Eliminar del Inventario</div>
+      <div class="delete-modal-body">
+        <div class="delete-input-row">
+          <label for="deleteReasonInput">Seleccione el Motivo:</label>
+          <input id="deleteReasonInput" class="delete-reason-input" type="text" placeholder="Ej. No se requiere mas">
+        </div>
+        <p class="delete-modal-error" id="deleteModalError"></p>
+      </div>
+      <div class="delete-modal-actions">
+        <button type="button" class="delete-modal-btn primary" id="confirmDeleteBtn">Aceptar</button>
+        <button type="button" class="delete-modal-btn secondary" id="cancelDeleteBtn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     (function() {
       // ----- SIDEBAR HOVER ya está en CSS, pero manejamos opción activa por si se desea cambiar. No es necesario JS para hover.
@@ -815,8 +951,15 @@
       const addModalError = document.getElementById('addModalError');
       const registerItemBtn = document.getElementById('registerItemBtn');
       const cancelAddBtn = document.getElementById('cancelAddBtn');
+      const deleteModalOverlay = document.getElementById('deleteModalOverlay');
+      const deleteReasonInput = document.getElementById('deleteReasonInput');
+      const deleteModalError = document.getElementById('deleteModalError');
+      const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+      const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
 
       let selectedRegisterType = 'material';
+      let pendingDeleteRow = null;
+      let pendingDeleteItemName = '';
 
       function escapeHtml(text) {
         return String(text)
@@ -870,6 +1013,30 @@
         addModalOverlay.classList.remove('show');
       }
 
+      function showDeleteError(message) {
+        if (!deleteModalError) return;
+        deleteModalError.innerText = message;
+      }
+
+      function openDeleteModal(row, itemName) {
+        if (!deleteModalOverlay) return;
+        pendingDeleteRow = row;
+        pendingDeleteItemName = itemName;
+        if (deleteReasonInput) {
+          deleteReasonInput.value = '';
+          deleteReasonInput.focus();
+        }
+        showDeleteError('');
+        deleteModalOverlay.classList.add('show');
+      }
+
+      function closeDeleteModal() {
+        if (!deleteModalOverlay) return;
+        deleteModalOverlay.classList.remove('show');
+        pendingDeleteRow = null;
+        pendingDeleteItemName = '';
+      }
+
       function formatQuantityByType(rawValue, type) {
         const source = (rawValue || '').trim();
         const numberMatch = source.match(/[\d.,]+/);
@@ -918,6 +1085,37 @@
         addModalOverlay.addEventListener('click', function(event) {
           if (event.target === addModalOverlay) {
             closeAddModal();
+          }
+        });
+      }
+
+      if (cancelDeleteBtn) {
+        cancelDeleteBtn.addEventListener('click', function() {
+          closeDeleteModal();
+        });
+      }
+
+      if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', function() {
+          const reason = deleteReasonInput ? deleteReasonInput.value.trim() : '';
+          if (!reason) {
+            showDeleteError('*Aviso: Ingrese un motivo para eliminar.');
+            return;
+          }
+
+          if (pendingDeleteRow) {
+            pendingDeleteRow.remove();
+          }
+
+          console.log(`Eliminar item: ${pendingDeleteItemName}. Motivo: ${reason}`);
+          closeDeleteModal();
+        });
+      }
+
+      if (deleteModalOverlay) {
+        deleteModalOverlay.addEventListener('click', function(event) {
+          if (event.target === deleteModalOverlay) {
+            closeDeleteModal();
           }
         });
       }
@@ -1023,10 +1221,9 @@
             e.stopPropagation();
             const item = getItemNameFromButton(deleteBtn);
             const row = deleteBtn.closest('tr');
-            if (row) {
-              row.remove();
+            if (row && item) {
+              openDeleteModal(row, item);
             }
-            console.log(`Eliminar item: ${item}`);
           }
         });
       }
@@ -1034,6 +1231,11 @@
       document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape' && addModalOverlay && addModalOverlay.classList.contains('show')) {
           closeAddModal();
+          return;
+        }
+
+        if (event.key === 'Escape' && deleteModalOverlay && deleteModalOverlay.classList.contains('show')) {
+          closeDeleteModal();
         }
       });
 
