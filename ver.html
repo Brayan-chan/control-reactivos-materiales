@@ -569,6 +569,10 @@
             <span class="info-label">Cantidad:</span>
             <span class="info-value" id="itemCantidad">10 Unidades</span>
           </div>
+          <div class="info-row" id="itemUnitMeasureRow" style="display: none;">
+            <span class="info-label">Unidad de Medida:</span>
+            <span class="info-value" id="itemUnitMeasure">-</span>
+          </div>
         </div>
 
         <!-- botones eliminar / editar (derecha) -->
@@ -818,6 +822,18 @@
         if (itemCategoria) itemCategoria.innerText = currentItem.categoria;
         if (itemEstado) itemEstado.innerText = currentItem.cantidad > 0 ? 'Disponible' : 'Sin stock';
         if (itemCantidad) itemCantidad.innerText = formatQuantityText(currentItem.cantidad, currentItem.unidad);
+        
+        // Mostrar Unidad de Medida solo para reactivos
+        const isReactivo = currentItem.categoria === 'Reactivo';
+        const itemUnitMeasureRow = document.getElementById('itemUnitMeasureRow');
+        const itemUnitMeasure = document.getElementById('itemUnitMeasure');
+        if (itemUnitMeasureRow) {
+          itemUnitMeasureRow.style.display = isReactivo ? 'flex' : 'none';
+        }
+        if (itemUnitMeasure && isReactivo) {
+          itemUnitMeasure.innerText = currentItem.unidad || '-';
+        }
+        
         document.title = `LabInventory · Detalle de ${currentItem.nombre}`;
       }
 
