@@ -330,6 +330,11 @@
       font-weight: 540;
     }
 
+    .status-badge.out-of-stock {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+
     /* dropdown básico (simulado con JS) */
     .filter-dropdown {
       position: relative;
@@ -801,38 +806,7 @@
                 <th>Acciones</th>
               </tr>
             </thead>
-            <tbody id="inventoryBody">
-              <tr data-item="Hisopos">
-                <td>Hisopos</td>
-                <td>Material</td>
-                <td><span class="status-badge">Disponible</span></td>
-                <td>10 unidades</td>
-                <td class="actions-cell">
-                  <button class="action-btn view-btn" data-action="ver"><svg viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M22 12c-2.667 4.667-6 7-10 7s-7.333-2.333-10-7c2.667-4.667 6-7 10-7s7.333 2.333 10 7z"/></svg> Ver</button>
-                  <button class="action-btn delete-btn" data-action="eliminar"><svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg> Eliminar</button>
-                </td>
-              </tr>
-              <tr data-item="Ácido Clorhídrico">
-                <td>Ácido Clorhídrico</td>
-                <td>Reactivo</td>
-                <td><span class="status-badge">Disponible</span></td>
-                <td>10 ml</td>
-                <td class="actions-cell">
-                  <button class="action-btn view-btn" data-action="ver"><svg viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M22 12c-2.667 4.667-6 7-10 7s-7.333-2.333-10-7c2.667-4.667 6-7 10-7s7.333 2.333 10 7z"/></svg> Ver</button>
-                  <button class="action-btn delete-btn" data-action="eliminar"><svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg> Eliminar</button>
-                </td>
-              </tr>
-              <tr data-item="Ácido Sulfúrico">
-                <td>Ácido Sulfúrico</td>
-                <td>Reactivo</td>
-                <td><span class="status-badge">Disponible</span></td>
-                <td>200 ml</td>
-                <td class="actions-cell">
-                  <button class="action-btn view-btn" data-action="ver"><svg viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M22 12c-2.667 4.667-6 7-10 7s-7.333-2.333-10-7c2.667-4.667 6-7 10-7s7.333 2.333 10 7z"/></svg> Ver</button>
-                  <button class="action-btn delete-btn" data-action="eliminar"><svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg> Eliminar</button>
-                </td>
-              </tr>
-            </tbody>
+            <tbody id="inventoryBody"></tbody>
           </table>
         </div>
       </div>
@@ -957,9 +931,163 @@
       const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
       const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
 
+      const STORAGE_KEY = 'lab_inventory_items_v1';
       let selectedRegisterType = 'material';
+      let inventoryItems = [];
+      let currentSearchText = '';
       let pendingDeleteRow = null;
       let pendingDeleteItemName = '';
+      let pendingDeleteItemId = '';
+
+      function createId() {
+        return `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      }
+
+      function getTodayDate() {
+        const now = new Date();
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = now.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
+
+      function safeParseInventory(raw) {
+        try {
+          const parsed = JSON.parse(raw || '[]');
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+          return [];
+        }
+      }
+
+      function formatAmount(value) {
+        return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+      }
+
+      function formatQuantityText(value, unit) {
+        return `${formatAmount(value)} ${unit}`.trim();
+      }
+
+      function parseQuantityInput(rawValue, fallbackUnit) {
+        const source = (rawValue || '').trim();
+        const numberMatch = source.match(/[\d.,]+/);
+        if (!numberMatch) return null;
+
+        const value = Number(numberMatch[0].replace(',', '.'));
+        if (!Number.isFinite(value) || value <= 0) return null;
+
+        const extractedUnit = source.replace(/[\d.,]+/g, '').trim();
+        const unit = extractedUnit || fallbackUnit;
+        return { value, unit };
+      }
+
+      function normalizeMovement(movement, defaultUnit) {
+        if (!movement || typeof movement !== 'object') return null;
+
+        const quantityInfo = typeof movement.cantidad === 'number'
+          ? { value: movement.cantidad, unit: movement.unidad || defaultUnit }
+          : parseQuantityInput(String(movement.cantidad || ''), movement.unidad || defaultUnit);
+
+        const quantity = quantityInfo ? quantityInfo.value : 0;
+        const unit = quantityInfo ? quantityInfo.unit : defaultUnit;
+
+        return {
+          movimiento: movement.movimiento || 'Movimiento',
+          cantidad: quantity,
+          unidad: unit,
+          fecha: movement.fecha || getTodayDate(),
+          responsable: movement.responsable || 'Coordinador',
+          laboratorio: movement.laboratorio || 'No aplica'
+        };
+      }
+
+      function normalizeInventoryItem(item) {
+        if (!item || typeof item !== 'object') return null;
+
+        const quantityInfo = typeof item.cantidad === 'number'
+          ? { value: item.cantidad, unit: item.unidad || 'unidades' }
+          : parseQuantityInput(String(item.cantidad || ''), item.unidad || 'unidades');
+
+        const cantidad = quantityInfo ? quantityInfo.value : 0;
+        const unidad = quantityInfo ? quantityInfo.unit : (item.unidad || 'unidades');
+
+        const historial = Array.isArray(item.historial)
+          ? item.historial.map(movement => normalizeMovement(movement, unidad)).filter(Boolean)
+          : [];
+
+        return {
+          id: item.id || createId(),
+          nombre: item.nombre || item.name || 'Sin nombre',
+          categoria: item.categoria || 'Material',
+          estado: cantidad > 0 ? 'Disponible' : 'Sin stock',
+          cantidad,
+          unidad,
+          cantidadMinima: typeof item.cantidadMinima === 'number' ? item.cantidadMinima : null,
+          proveedor: item.proveedor || '',
+          usuarioResponsable: item.usuarioResponsable || 'Coordinador',
+          historial
+        };
+      }
+
+      function saveInventoryItems(items) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      }
+
+      function loadInventoryItems() {
+        const parsed = safeParseInventory(localStorage.getItem(STORAGE_KEY));
+        const normalized = parsed.map(normalizeInventoryItem).filter(Boolean);
+        saveInventoryItems(normalized);
+        return normalized;
+      }
+
+      function renderInventoryTable(items) {
+        if (!inventoryBody) return;
+
+        if (!items.length) {
+          inventoryBody.innerHTML = `
+            <tr>
+              <td colspan="5" style="text-align:center;color:#64748b;">No hay materiales/reactivos registrados.</td>
+            </tr>
+          `;
+          return;
+        }
+
+        inventoryBody.innerHTML = items.map(item => {
+          const quantityText = formatQuantityText(item.cantidad, item.unidad);
+          const isAvailable = item.cantidad > 0;
+          const statusClass = isAvailable ? 'status-badge' : 'status-badge out-of-stock';
+          const statusText = isAvailable ? 'Disponible' : 'Sin stock';
+
+          return `
+            <tr data-id="${item.id}" data-item="${escapeHtml(item.nombre)}">
+              <td>${escapeHtml(item.nombre)}</td>
+              <td>${escapeHtml(item.categoria)}</td>
+              <td><span class="${statusClass}">${statusText}</span></td>
+              <td>${escapeHtml(quantityText)}</td>
+              <td class="actions-cell">
+                <button class="action-btn view-btn" data-action="ver"><svg viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M22 12c-2.667 4.667-6 7-10 7s-7.333-2.333-10-7c2.667-4.667 6-7 10-7s7.333 2.333 10 7z"/></svg> Ver</button>
+                <button class="action-btn delete-btn" data-action="eliminar"><svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg> Eliminar</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      function applySearch() {
+        const query = currentSearchText.trim().toLowerCase();
+        if (!query) {
+          renderInventoryTable(inventoryItems);
+          return;
+        }
+
+        const filtered = inventoryItems.filter(item => {
+          return item.nombre.toLowerCase().includes(query)
+            || item.categoria.toLowerCase().includes(query)
+            || formatQuantityText(item.cantidad, item.unidad).toLowerCase().includes(query);
+        });
+
+        renderInventoryTable(filtered);
+      }
 
       function escapeHtml(text) {
         return String(text)
@@ -1022,6 +1150,7 @@
         if (!deleteModalOverlay) return;
         pendingDeleteRow = row;
         pendingDeleteItemName = itemName;
+        pendingDeleteItemId = row ? (row.getAttribute('data-id') || '') : '';
         if (deleteReasonInput) {
           deleteReasonInput.value = '';
           deleteReasonInput.focus();
@@ -1035,6 +1164,7 @@
         deleteModalOverlay.classList.remove('show');
         pendingDeleteRow = null;
         pendingDeleteItemName = '';
+        pendingDeleteItemId = '';
       }
 
       function formatQuantityByType(rawValue, type) {
@@ -1103,7 +1233,11 @@
             return;
           }
 
-          if (pendingDeleteRow) {
+          if (pendingDeleteItemId) {
+            inventoryItems = inventoryItems.filter(item => item.id !== pendingDeleteItemId);
+            saveInventoryItems(inventoryItems);
+            applySearch();
+          } else if (pendingDeleteRow) {
             pendingDeleteRow.remove();
           }
 
@@ -1123,33 +1257,42 @@
       if (registerItemBtn) {
         registerItemBtn.addEventListener('click', function() {
           const itemName = (itemNameInput ? itemNameInput.value : '').trim();
-          const qtyText = formatQuantityByType(itemQtyInput ? itemQtyInput.value : '', selectedRegisterType);
+          const defaultUnit = selectedRegisterType === 'reactivo' ? 'ml' : 'unidades';
+          const qtyData = parseQuantityInput(itemQtyInput ? itemQtyInput.value : '', defaultUnit);
+          const minData = parseQuantityInput(itemMinQtyInput ? itemMinQtyInput.value : '', defaultUnit);
+          const responsable = (itemUserInput ? itemUserInput.value.trim() : '') || 'Coordinador';
 
-          if (!itemName || !qtyText) {
+          if (!itemName || !qtyData) {
             showAddError('*Aviso: Complete nombre y cantidad valida para registrar.');
             return;
           }
 
-          if (!inventoryBody) return;
-
           const categoria = selectedRegisterType === 'reactivo' ? 'Reactivo' : 'Material';
-          const safeItemName = escapeHtml(itemName);
-          const safeQtyText = escapeHtml(qtyText);
+          const newItem = {
+            id: createId(),
+            nombre: itemName,
+            categoria,
+            estado: qtyData.value > 0 ? 'Disponible' : 'Sin stock',
+            cantidad: qtyData.value,
+            unidad: qtyData.unit,
+            cantidadMinima: minData ? minData.value : null,
+            proveedor: itemProviderInput ? itemProviderInput.value.trim() : '',
+            usuarioResponsable: responsable,
+            historial: [
+              {
+                movimiento: 'Abastecimiento',
+                cantidad: qtyData.value,
+                unidad: qtyData.unit,
+                fecha: getTodayDate(),
+                responsable,
+                laboratorio: 'No aplica'
+              }
+            ]
+          };
 
-          const row = document.createElement('tr');
-          row.setAttribute('data-item', itemName);
-          row.innerHTML = `
-            <td>${safeItemName}</td>
-            <td>${categoria}</td>
-            <td><span class="status-badge">Disponible</span></td>
-            <td>${safeQtyText}</td>
-            <td class="actions-cell">
-              <button class="action-btn view-btn" data-action="ver"><svg viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M22 12c-2.667 4.667-6 7-10 7s-7.333-2.333-10-7c2.667-4.667 6-7 10-7s7.333 2.333 10 7z"/></svg> Ver</button>
-              <button class="action-btn delete-btn" data-action="eliminar"><svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg> Eliminar</button>
-            </td>
-          `;
-
-          inventoryBody.prepend(row);
+          inventoryItems.unshift(newItem);
+          saveInventoryItems(inventoryItems);
+          applySearch();
           closeAddModal();
         });
       }
@@ -1159,15 +1302,16 @@
       const searchInput = document.getElementById('searchInput');
       if (searchBtn) {
         searchBtn.addEventListener('click', function() {
-          const query = searchInput ? searchInput.value : '';
-          console.log('Búsqueda realizada:', query);
+          currentSearchText = searchInput ? searchInput.value : '';
+          applySearch();
         });
       }
       // opcional input enter
       if (searchInput) {
         searchInput.addEventListener('keypress', function(e) {
           if(e.key === 'Enter') {
-            console.log('Búsqueda con Enter:', this.value);
+            currentSearchText = this.value;
+            applySearch();
           }
         });
       }
@@ -1205,6 +1349,12 @@
           const viewBtn = e.target.closest('.view-btn');
           if (viewBtn) {
             e.stopPropagation();
+            const row = viewBtn.closest('tr');
+            const itemId = row ? row.getAttribute('data-id') : '';
+            if (itemId) {
+              window.location.href = `ver.html?id=${encodeURIComponent(itemId)}`;
+              return;
+            }
             const item = getItemDataFromButton(viewBtn);
             const params = new URLSearchParams({
               nombre: item.nombre,
@@ -1238,6 +1388,9 @@
           closeDeleteModal();
         }
       });
+
+      inventoryItems = loadInventoryItems();
+      applySearch();
 
       // (Opcional) para dar consistencia al hover de sidebar, ya está en CSS.
 
