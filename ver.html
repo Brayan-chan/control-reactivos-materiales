@@ -654,29 +654,7 @@
                 <th>Laboratorio</th>
               </tr>
             </thead>
-            <tbody id="historyBody">
-              <tr>
-                <td>Consumo</td>
-                <td>2 Unidades</td>
-                <td>16/03/2026</td>
-                <td>Coordinador</td>
-                <td>No aplica</td>
-              </tr>
-              <tr>
-                <td>Abastecimiento</td>
-                <td>10 Unidades</td>
-                <td>14/03/2026</td>
-                <td>Coordinador</td>
-                <td>No aplica</td>
-              </tr>
-              <tr>
-                <td>Asignación</td>
-                <td>3 Unidades</td>
-                <td>12/03/2026</td>
-                <td>Coordinador</td>
-                <td>Microbiología</td>
-              </tr>
-            </tbody>
+            <tbody id="historyBody"></tbody>
           </table>
         </div>
       </div>
@@ -723,6 +701,8 @@
 
   <script>
     (function() {
+      const STORAGE_KEY = 'lab_inventory_items_v1';
+
       const itemTitle = document.getElementById('itemTitle');
       const itemCategoria = document.getElementById('itemCategoria');
       const itemEstado = document.getElementById('itemEstado');
@@ -746,47 +726,36 @@
       const supplyModalTitle = document.getElementById('supplyModalTitle');
       const supplyAcceptBtn = document.getElementById('supplyAcceptBtn');
       const supplyCancelBtn = document.getElementById('supplyCancelBtn');
+      const consumirBtn = document.getElementById('consumirBtn');
+      const asignarBtn = document.getElementById('asignarBtn');
+      const abastecerBtn = document.getElementById('abastecerBtn');
+      const eliminarBtn = document.getElementById('eliminarBtn');
+      const editarBtn = document.getElementById('editarBtn');
 
       const params = new URLSearchParams(window.location.search);
-      const nombre = params.get('nombre') || (itemTitle ? itemTitle.innerText : 'Material/Reactivo');
-      const categoria = params.get('categoria') || (itemCategoria ? itemCategoria.innerText : 'Sin categoría');
-      const estado = params.get('estado') || (itemEstado ? itemEstado.innerText : 'Sin estado');
-      const cantidad = params.get('cantidad') || (itemCantidad ? itemCantidad.innerText : 'Sin cantidad');
 
-      const movementHistoryByItem = {
-        'Hisopo': [
-          { movimiento: 'Consumo', cantidad: '2 Unidades', fecha: '16/03/2026', responsable: 'Coordinador', laboratorio: 'No aplica' },
-          { movimiento: 'Abastecimiento', cantidad: '10 Unidades', fecha: '14/03/2026', responsable: 'Coordinador', laboratorio: 'No aplica' },
-          { movimiento: 'Asignación', cantidad: '3 Unidades', fecha: '12/03/2026', responsable: 'Coordinador', laboratorio: 'Microbiología' }
-        ],
-        'Hisopos': [
-          { movimiento: 'Consumo', cantidad: '2 Unidades', fecha: '16/03/2026', responsable: 'Coordinador', laboratorio: 'No aplica' },
-          { movimiento: 'Abastecimiento', cantidad: '10 Unidades', fecha: '14/03/2026', responsable: 'Coordinador', laboratorio: 'No aplica' },
-          { movimiento: 'Asignación', cantidad: '3 Unidades', fecha: '12/03/2026', responsable: 'Coordinador', laboratorio: 'Microbiología' }
-        ],
-        'Ácido Clorhídrico': [
-          { movimiento: 'Consumo', cantidad: '5 ml', fecha: '18/03/2026', responsable: 'Coordinador', laboratorio: 'Química Analítica' },
-          { movimiento: 'Abastecimiento', cantidad: '20 ml', fecha: '15/03/2026', responsable: 'Coordinador', laboratorio: 'No aplica' },
-          { movimiento: 'Asignación', cantidad: '3 ml', fecha: '11/03/2026', responsable: 'Coordinador', laboratorio: 'Fisicoquímica' }
-        ],
-        'Ácido Sulfúrico': [
-          { movimiento: 'Consumo', cantidad: '15 ml', fecha: '17/03/2026', responsable: 'Coordinador', laboratorio: 'Química Orgánica' },
-          { movimiento: 'Abastecimiento', cantidad: '100 ml', fecha: '13/03/2026', responsable: 'Coordinador', laboratorio: 'No aplica' },
-          { movimiento: 'Asignación', cantidad: '25 ml', fecha: '10/03/2026', responsable: 'Coordinador', laboratorio: 'Bioquímica' }
-        ]
-      };
+      let inventoryItems = [];
+      let currentItem = null;
 
-      function parseQuantityData(text) {
-        const source = (text || '').trim();
-        const numberMatch = source.match(/[\d.,]+/);
-        const rawNumber = numberMatch ? numberMatch[0].replace(',', '.') : '0';
-        const value = Number(rawNumber);
-        const unit = source.replace(/[\d.,]+/g, '').trim() || 'Unidades';
+      function getTodayDate() {
+        const now = new Date();
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = now.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
 
-        return {
-          value: Number.isFinite(value) ? value : 0,
-          unit
-        };
+      function safeParseInventory(raw) {
+        try {
+          const parsed = JSON.parse(raw || '[]');
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+          return [];
+        }
+      }
+
+      function saveInventoryItems(items) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
       }
 
       function formatAmount(value) {
@@ -797,37 +766,100 @@
         return `${formatAmount(value)} ${unit}`.trim();
       }
 
-      function getTodayDate() {
-        const now = new Date();
-        const day = String(now.getDate()).padStart(2, '0');
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const year = now.getFullYear();
-        return `${day}/${month}/${year}`;
+      function parseQuantityInput(rawValue, fallbackUnit) {
+        const source = (rawValue || '').trim();
+        const numberMatch = source.match(/[\d.,]+/);
+        if (!numberMatch) return null;
+
+        const value = Number(numberMatch[0].replace(',', '.'));
+        if (!Number.isFinite(value)) return null;
+
+        const extractedUnit = source.replace(/[\d.,]+/g, '').trim();
+        const unit = extractedUnit || fallbackUnit;
+        return { value, unit };
       }
 
-      const initialQuantityData = parseQuantityData(cantidad);
-      let currentQuantityValue = initialQuantityData.value;
-      let currentQuantityUnit = initialQuantityData.unit;
+      function normalizeMovement(movement, defaultUnit) {
+        if (!movement || typeof movement !== 'object') return null;
 
-      function resolveItemType(categoryText, unitText) {
-        const category = (categoryText || '').toLowerCase();
-        const unit = (unitText || '').toLowerCase();
-        const isReactivoByCategory = category.includes('reactivo');
-        const isReactivoByUnit = unit.includes('ml') || unit === 'l';
-        return (isReactivoByCategory || isReactivoByUnit) ? 'Reactivo' : 'Material';
+        const quantityInfo = typeof movement.cantidad === 'number'
+          ? { value: movement.cantidad, unit: movement.unidad || defaultUnit }
+          : parseQuantityInput(String(movement.cantidad || ''), movement.unidad || defaultUnit);
+
+        const quantity = quantityInfo ? quantityInfo.value : 0;
+        const unit = quantityInfo ? quantityInfo.unit : defaultUnit;
+
+        return {
+          movimiento: movement.movimiento || 'Movimiento',
+          cantidad: quantity,
+          unidad: unit,
+          fecha: movement.fecha || getTodayDate(),
+          responsable: movement.responsable || 'Coordinador',
+          laboratorio: movement.laboratorio || 'No aplica'
+        };
       }
 
-      const currentItemType = resolveItemType(categoria, currentQuantityUnit);
+      function normalizeInventoryItem(item) {
+        if (!item || typeof item !== 'object') return null;
 
-      function renderHistory(itemName) {
-        if (!historyBody) return;
+        const quantityInfo = typeof item.cantidad === 'number'
+          ? { value: item.cantidad, unit: item.unidad || 'Unidades' }
+          : parseQuantityInput(String(item.cantidad || ''), item.unidad || 'Unidades');
 
-        const rows = movementHistoryByItem[itemName] || [];
+        const cantidad = quantityInfo ? quantityInfo.value : 0;
+        const unidad = quantityInfo ? quantityInfo.unit : (item.unidad || 'Unidades');
+        const historial = Array.isArray(item.historial)
+          ? item.historial.map(movement => normalizeMovement(movement, unidad)).filter(Boolean)
+          : [];
 
-        if (rows.length === 0) {
+        return {
+          id: item.id || '',
+          nombre: item.nombre || 'Material/Reactivo',
+          categoria: item.categoria || 'Material',
+          estado: cantidad > 0 ? 'Disponible' : 'Sin stock',
+          cantidad,
+          unidad,
+          historial,
+          usuarioResponsable: item.usuarioResponsable || 'Coordinador'
+        };
+      }
+
+      function loadInventoryItems() {
+        const parsed = safeParseInventory(localStorage.getItem(STORAGE_KEY));
+        const normalized = parsed.map(normalizeInventoryItem).filter(Boolean);
+        saveInventoryItems(normalized);
+        return normalized;
+      }
+
+      function resolveItemType(item) {
+        return (item.categoria || '').toLowerCase().includes('reactivo') ? 'Reactivo' : 'Material';
+      }
+
+      function persistCurrentItem() {
+        if (!currentItem || !currentItem.id) return;
+        const index = inventoryItems.findIndex(item => item.id === currentItem.id);
+        if (index === -1) return;
+        inventoryItems[index] = currentItem;
+        saveInventoryItems(inventoryItems);
+      }
+
+      function renderCurrentItem() {
+        if (!currentItem) return;
+        if (itemTitle) itemTitle.innerText = currentItem.nombre;
+        if (itemCategoria) itemCategoria.innerText = currentItem.categoria;
+        if (itemEstado) itemEstado.innerText = currentItem.cantidad > 0 ? 'Disponible' : 'Sin stock';
+        if (itemCantidad) itemCantidad.innerText = formatQuantityText(currentItem.cantidad, currentItem.unidad);
+        document.title = `LabInventory · Detalle de ${currentItem.nombre}`;
+      }
+
+      function renderHistory() {
+        if (!historyBody || !currentItem) return;
+
+        const rows = Array.isArray(currentItem.historial) ? currentItem.historial : [];
+        if (!rows.length) {
           historyBody.innerHTML = `
             <tr>
-              <td colspan="5">Sin movimientos registrados para ${itemName}</td>
+              <td colspan="5">Sin movimientos registrados para ${currentItem.nombre}</td>
             </tr>
           `;
           return;
@@ -836,7 +868,7 @@
         historyBody.innerHTML = rows.map(row => `
           <tr>
             <td>${row.movimiento}</td>
-            <td>${row.cantidad}</td>
+            <td>${formatQuantityText(row.cantidad, row.unidad || currentItem.unidad)}</td>
             <td>${row.fecha}</td>
             <td>${row.responsable}</td>
             <td>${row.laboratorio}</td>
@@ -849,25 +881,30 @@
         consumeError.innerText = message;
       }
 
+      function showSupplyError(message) {
+        if (!supplyError) return;
+        supplyError.innerText = message;
+      }
+
       function openConsumeModal() {
-        if (!consumeModalOverlay) return;
+        if (!consumeModalOverlay || !currentItem) return;
+
+        const itemType = resolveItemType(currentItem);
         if (consumeModalTitle) {
-          consumeModalTitle.innerText = `Registrar Consumo de ${currentItemType}`;
+          consumeModalTitle.innerText = `Registrar Consumo de ${itemType}`;
         }
         if (consumeAvailable) {
-          consumeAvailable.innerText = `Cantidad Disponible: ${formatQuantityText(currentQuantityValue, currentQuantityUnit)}`;
+          consumeAvailable.innerText = `Cantidad Disponible: ${formatQuantityText(currentItem.cantidad, currentItem.unidad)}`;
         }
         if (consumeUnitText) {
-          consumeUnitText.innerText = currentQuantityUnit;
+          consumeUnitText.innerText = currentItem.unidad;
         }
         if (consumeInputLabel) {
-          consumeInputLabel.innerText = currentItemType === 'Reactivo'
-            ? `Cantidad a Consumir (${currentQuantityUnit})`
-            : 'Cantidad a Consumir';
+          consumeInputLabel.innerText = `Cantidad a Consumir (${currentItem.unidad})`;
         }
         if (consumeInput) {
           consumeInput.value = '';
-          consumeInput.placeholder = currentItemType === 'Reactivo' ? 'Ingrese una cantidad en volumen' : 'Ingrese una cantidad';
+          consumeInput.placeholder = itemType === 'Reactivo' ? `Ej. 5 ${currentItem.unidad}` : `Ej. 3 ${currentItem.unidad}`;
         }
         showConsumeError('');
         consumeModalOverlay.classList.add('show');
@@ -881,28 +918,25 @@
         consumeModalOverlay.classList.remove('show');
       }
 
-      function showSupplyError(message) {
-        if (!supplyError) return;
-        supplyError.innerText = message;
-      }
-
       function openSupplyModal() {
-        if (!supplyModalOverlay) return;
+        if (!supplyModalOverlay || !currentItem) return;
+
+        const itemType = resolveItemType(currentItem);
         if (supplyModalTitle) {
-          supplyModalTitle.innerText = `Abastecer ${currentItemType}`;
+          supplyModalTitle.innerText = `Abastecer ${itemType}`;
         }
         if (supplyAvailable) {
-          supplyAvailable.innerText = `Cantidad Disponible: ${formatQuantityText(currentQuantityValue, currentQuantityUnit)}`;
+          supplyAvailable.innerText = `Cantidad Disponible: ${formatQuantityText(currentItem.cantidad, currentItem.unidad)}`;
         }
         if (supplyUnitText) {
-          supplyUnitText.innerText = currentQuantityUnit;
+          supplyUnitText.innerText = currentItem.unidad;
         }
         if (supplyInputLabel) {
-          supplyInputLabel.innerText = `Ingrese la Cantidad de ${currentItemType}:`;
+          supplyInputLabel.innerText = `Ingrese la Cantidad de ${itemType} (${currentItem.unidad}):`;
         }
         if (supplyInput) {
           supplyInput.value = '';
-          supplyInput.placeholder = currentItemType === 'Reactivo' ? 'Ingrese una cantidad en volumen' : 'Ingrese una cantidad';
+          supplyInput.placeholder = itemType === 'Reactivo' ? `Ej. 25 ${currentItem.unidad}` : `Ej. 10 ${currentItem.unidad}`;
         }
         showSupplyError('');
         supplyModalOverlay.classList.add('show');
@@ -916,44 +950,46 @@
         supplyModalOverlay.classList.remove('show');
       }
 
-      if (itemTitle) itemTitle.innerText = nombre;
-      if (itemCategoria) itemCategoria.innerText = categoria;
-      if (itemEstado) itemEstado.innerText = estado;
-      if (itemCantidad) itemCantidad.innerText = formatQuantityText(currentQuantityValue, currentQuantityUnit);
-      renderHistory(nombre);
+      function loadCurrentItemFromContext() {
+        const id = params.get('id');
+        const fallbackName = params.get('nombre') || (itemTitle ? itemTitle.innerText : 'Material/Reactivo');
+        const fallbackCategory = params.get('categoria') || (itemCategoria ? itemCategoria.innerText : 'Material');
+        const fallbackState = params.get('estado') || (itemEstado ? itemEstado.innerText : 'Disponible');
+        const fallbackQuantityText = params.get('cantidad') || (itemCantidad ? itemCantidad.innerText : '0 Unidades');
+        const parsedFallback = parseQuantityInput(fallbackQuantityText, 'Unidades') || { value: 0, unit: 'Unidades' };
 
-      document.title = `LabInventory · Detalle de ${nombre}`;
+        if (id) {
+          const foundById = inventoryItems.find(item => item.id === id);
+          if (foundById) return foundById;
+        }
 
-      // ---- BOTONES DE ACCIÓN: eliminar / editar (desde card principal)
-      const eliminarBtn = document.getElementById('eliminarBtn');
-      const editarBtn = document.getElementById('editarBtn');
+        const foundByName = inventoryItems.find(item => item.nombre.toLowerCase() === fallbackName.toLowerCase());
+        if (foundByName) return foundByName;
 
-      if (eliminarBtn) {
-        eliminarBtn.addEventListener('click', function() {
-          console.log('Eliminar item');
-        });
+        return {
+          id: '',
+          nombre: fallbackName,
+          categoria: fallbackCategory,
+          estado: fallbackState,
+          cantidad: parsedFallback.value,
+          unidad: parsedFallback.unit,
+          historial: [],
+          usuarioResponsable: 'Coordinador'
+        };
       }
-      if (editarBtn) {
-        editarBtn.addEventListener('click', function() {
-          console.log('Editar item');
-        });
-      }
-
-      // ---- BOTONES de movimiento: consumir, asignar, abastecer
-      const consumirBtn = document.getElementById('consumirBtn');
-      const asignarBtn = document.getElementById('asignarBtn');
-      const abastecerBtn = document.getElementById('abastecerBtn');
 
       if (consumirBtn) {
         consumirBtn.addEventListener('click', function() {
           openConsumeModal();
         });
       }
+
       if (asignarBtn) {
         asignarBtn.addEventListener('click', function() {
           console.log('Asignar');
         });
       }
+
       if (abastecerBtn) {
         abastecerBtn.addEventListener('click', function() {
           openSupplyModal();
@@ -968,37 +1004,39 @@
 
       if (consumeAcceptBtn) {
         consumeAcceptBtn.addEventListener('click', function() {
-          const rawInput = consumeInput ? consumeInput.value.trim() : '';
-          const amountToConsume = Number(rawInput.replace(',', '.'));
+          if (!currentItem) return;
 
-          if (!Number.isFinite(amountToConsume) || amountToConsume <= 0) {
+          const request = parseQuantityInput(consumeInput ? consumeInput.value : '', currentItem.unidad);
+          if (!request || !Number.isFinite(request.value) || request.value <= 0) {
             showConsumeError('*Aviso: Ingrese una cantidad valida');
             return;
           }
 
-          if (amountToConsume > currentQuantityValue) {
+          if ((request.unit || '').toLowerCase() !== (currentItem.unidad || '').toLowerCase()) {
+            showConsumeError(`*Aviso: La unidad debe ser ${currentItem.unidad}`);
+            return;
+          }
+
+          if (request.value > currentItem.cantidad) {
             showConsumeError('*Aviso: Cantidad insuficiente');
             return;
           }
 
-          currentQuantityValue = Number((currentQuantityValue - amountToConsume).toFixed(2));
-          if (itemCantidad) {
-            itemCantidad.innerText = formatQuantityText(currentQuantityValue, currentQuantityUnit);
-          }
-
-          if (!movementHistoryByItem[nombre]) {
-            movementHistoryByItem[nombre] = [];
-          }
-
-          movementHistoryByItem[nombre].unshift({
+          currentItem.cantidad = Number((currentItem.cantidad - request.value).toFixed(2));
+          currentItem.estado = currentItem.cantidad > 0 ? 'Disponible' : 'Sin stock';
+          currentItem.historial = Array.isArray(currentItem.historial) ? currentItem.historial : [];
+          currentItem.historial.unshift({
             movimiento: 'Consumo',
-            cantidad: formatQuantityText(amountToConsume, currentQuantityUnit),
+            cantidad: request.value,
+            unidad: currentItem.unidad,
             fecha: getTodayDate(),
             responsable: 'Coordinador',
             laboratorio: 'No aplica'
           });
 
-          renderHistory(nombre);
+          persistCurrentItem();
+          renderCurrentItem();
+          renderHistory();
           closeConsumeModal();
         });
       }
@@ -1019,32 +1057,34 @@
 
       if (supplyAcceptBtn) {
         supplyAcceptBtn.addEventListener('click', function() {
-          const rawInput = supplyInput ? supplyInput.value.trim() : '';
-          const amountToSupply = Number(rawInput.replace(',', '.'));
+          if (!currentItem) return;
 
-          if (!Number.isFinite(amountToSupply) || amountToSupply <= 0) {
+          const request = parseQuantityInput(supplyInput ? supplyInput.value : '', currentItem.unidad);
+          if (!request || !Number.isFinite(request.value) || request.value <= 0) {
             showSupplyError('*Aviso: Ingrese una cantidad valida');
             return;
           }
 
-          currentQuantityValue = Number((currentQuantityValue + amountToSupply).toFixed(2));
-          if (itemCantidad) {
-            itemCantidad.innerText = formatQuantityText(currentQuantityValue, currentQuantityUnit);
+          if ((request.unit || '').toLowerCase() !== (currentItem.unidad || '').toLowerCase()) {
+            showSupplyError(`*Aviso: La unidad debe ser ${currentItem.unidad}`);
+            return;
           }
 
-          if (!movementHistoryByItem[nombre]) {
-            movementHistoryByItem[nombre] = [];
-          }
-
-          movementHistoryByItem[nombre].unshift({
+          currentItem.cantidad = Number((currentItem.cantidad + request.value).toFixed(2));
+          currentItem.estado = currentItem.cantidad > 0 ? 'Disponible' : 'Sin stock';
+          currentItem.historial = Array.isArray(currentItem.historial) ? currentItem.historial : [];
+          currentItem.historial.unshift({
             movimiento: 'Abastecimiento',
-            cantidad: formatQuantityText(amountToSupply, currentQuantityUnit),
+            cantidad: request.value,
+            unidad: currentItem.unidad,
             fecha: getTodayDate(),
             responsable: 'Coordinador',
             laboratorio: 'No aplica'
           });
 
-          renderHistory(nombre);
+          persistCurrentItem();
+          renderCurrentItem();
+          renderHistory();
           closeSupplyModal();
         });
       }
@@ -1054,6 +1094,30 @@
           if (event.target === supplyModalOverlay) {
             closeSupplyModal();
           }
+        });
+      }
+
+      if (eliminarBtn) {
+        eliminarBtn.addEventListener('click', function() {
+          if (!currentItem || !currentItem.id) {
+            console.log('Eliminar item: no hay item persistido en localStorage.');
+            return;
+          }
+
+          const reason = window.prompt('Ingrese motivo de eliminacion:');
+          if (!reason || !reason.trim()) {
+            return;
+          }
+
+          inventoryItems = inventoryItems.filter(item => item.id !== currentItem.id);
+          saveInventoryItems(inventoryItems);
+          window.location.href = 'index.html';
+        });
+      }
+
+      if (editarBtn) {
+        editarBtn.addEventListener('click', function() {
+          console.log('Editar item:', currentItem ? currentItem.nombre : 'sin item');
         });
       }
 
@@ -1068,7 +1132,10 @@
         }
       });
 
-      console.log(`Vista de detalle cargada para "${nombre}"`);
+      inventoryItems = loadInventoryItems();
+      currentItem = loadCurrentItemFromContext();
+      renderCurrentItem();
+      renderHistory();
     })();
   </script>
 </body>
