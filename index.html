@@ -484,6 +484,8 @@
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
     }
 
+
+
     .add-modal-error {
       min-height: 24px;
       margin-top: 16px;
@@ -809,26 +811,55 @@
 
         <h3 class="add-form-title">Informacion de Registro</h3>
 
-        <div class="add-form-grid">
+        <!-- FORMULARIO PARA MATERIAL -->
+        <div id="materialForm" class="add-form-grid">
           <div class="add-field">
-            <label id="itemNameLabel" for="itemNameInput">Nombre del Material</label>
-            <input id="itemNameInput" type="text" placeholder="Ej. Hisopo">
+            <label for="materialNameInput">Nombre del Material</label>
+            <input id="materialNameInput" type="text" placeholder="Ej. Hisopo">
           </div>
           <div class="add-field">
-            <label for="itemMinQtyInput">Cantidad Minima Disponible</label>
-            <input id="itemMinQtyInput" type="text" placeholder="Ej. 10 Unidades">
+            <label for="materialMinQtyInput">Cantidad Minima Disponible</label>
+            <input id="materialMinQtyInput" type="text" placeholder="Ej. 10 unidades">
           </div>
           <div class="add-field">
-            <label for="itemProviderInput">Proveedor</label>
-            <input id="itemProviderInput" type="text" placeholder="Ej. Proveedor">
+            <label for="materialProviderInput">Proveedor</label>
+            <input id="materialProviderInput" type="text" placeholder="Ej. Proveedor">
           </div>
           <div class="add-field">
-            <label id="itemQtyLabel" for="itemQtyInput">Cantidad a Ingresar</label>
-            <input id="itemQtyInput" type="text" placeholder="Ej. 3 Unidades">
+            <label for="materialQtyInput">Cantidad a Ingresar</label>
+            <input id="materialQtyInput" type="text" placeholder="Ej. 3 unidades">
           </div>
           <div class="add-field">
-            <label for="itemUserInput">Usuario Responsable</label>
-            <input id="itemUserInput" type="text" placeholder="Ej. Coordinador">
+            <label for="materialUserInput">Usuario Responsable</label>
+            <input id="materialUserInput" type="text" placeholder="Ej. Coordinador">
+          </div>
+        </div>
+
+        <!-- FORMULARIO PARA REACTIVO -->
+        <div id="reactivoForm" class="add-form-grid" style="display: none;">
+          <div class="add-field">
+            <label for="reactivoNameInput">Nombre del Reactivo</label>
+            <input id="reactivoNameInput" type="text" placeholder="Ej. Ácido Clorhídrico">
+          </div>
+          <div class="add-field">
+            <label for="reactivoUnitMeasureInput">Unidad de Medida</label>
+            <input id="reactivoUnitMeasureInput" type="text" placeholder="Ej. Mililitros (ml)">
+          </div>
+          <div class="add-field">
+            <label for="reactivoMinQtyInput">Cantidad Minima Disponible</label>
+            <input id="reactivoMinQtyInput" type="text" placeholder="Ej. 100 ml">
+          </div>
+          <div class="add-field">
+            <label for="reactivoQtyInput">Cantidad a Ingresar</label>
+            <input id="reactivoQtyInput" type="text" placeholder="Ej. 50 ml">
+          </div>
+          <div class="add-field">
+            <label for="reactivoUserInput">Usuario Responsable</label>
+            <input id="reactivoUserInput" type="text" placeholder="Ej. Coordinador">
+          </div>
+          <div class="add-field">
+            <label for="reactivoProviderInput">Proveedor</label>
+            <input id="reactivoProviderInput" type="text" placeholder="Ej. Proveedor químico">
           </div>
         </div>
 
@@ -911,13 +942,24 @@
       const addModalOverlay = document.getElementById('addModalOverlay');
       const typeMaterialBtn = document.getElementById('typeMaterialBtn');
       const typeReactivoBtn = document.getElementById('typeReactivoBtn');
-      const itemNameLabel = document.getElementById('itemNameLabel');
-      const itemQtyLabel = document.getElementById('itemQtyLabel');
-      const itemNameInput = document.getElementById('itemNameInput');
-      const itemMinQtyInput = document.getElementById('itemMinQtyInput');
-      const itemProviderInput = document.getElementById('itemProviderInput');
-      const itemQtyInput = document.getElementById('itemQtyInput');
-      const itemUserInput = document.getElementById('itemUserInput');
+      const materialForm = document.getElementById('materialForm');
+      const reactivoForm = document.getElementById('reactivoForm');
+      
+      // Material inputs
+      const materialNameInput = document.getElementById('materialNameInput');
+      const materialMinQtyInput = document.getElementById('materialMinQtyInput');
+      const materialProviderInput = document.getElementById('materialProviderInput');
+      const materialQtyInput = document.getElementById('materialQtyInput');
+      const materialUserInput = document.getElementById('materialUserInput');
+      
+      // Reactivo inputs
+      const reactivoNameInput = document.getElementById('reactivoNameInput');
+      const reactivoUnitMeasureInput = document.getElementById('reactivoUnitMeasureInput');
+      const reactivoMinQtyInput = document.getElementById('reactivoMinQtyInput');
+      const reactivoQtyInput = document.getElementById('reactivoQtyInput');
+      const reactivoUserInput = document.getElementById('reactivoUserInput');
+      const reactivoProviderInput = document.getElementById('reactivoProviderInput');
+      
       const addModalError = document.getElementById('addModalError');
       const registerItemBtn = document.getElementById('registerItemBtn');
       const cancelAddBtn = document.getElementById('cancelAddBtn');
@@ -1068,6 +1110,11 @@
             </tr>
           `;
         }).join('');
+        
+        // Reiniciar Lucide Icons después de renderizar la tabla
+        if (window.lucide) {
+          lucide.createIcons();
+        }
       }
 
       function applySearch() {
@@ -1113,26 +1160,31 @@
 
       function setRegisterType(type) {
         selectedRegisterType = type;
-
         const isMaterial = type === 'material';
 
         if (typeMaterialBtn) typeMaterialBtn.classList.toggle('active', isMaterial);
         if (typeReactivoBtn) typeReactivoBtn.classList.toggle('active', !isMaterial);
-
-        if (itemNameLabel) itemNameLabel.innerText = isMaterial ? 'Nombre del Material' : 'Nombre del Reactivo';
-        if (itemQtyLabel) itemQtyLabel.innerText = isMaterial ? 'Cantidad a Ingresar' : 'Cantidad a Ingresar (ml)';
-        if (itemNameInput) itemNameInput.placeholder = isMaterial ? 'Ej. Hisopo' : 'Ej. Acido Clorhidrico';
-        if (itemMinQtyInput) itemMinQtyInput.placeholder = isMaterial ? 'Ej. 10 Unidades' : 'Ej. 100 ml';
-        if (itemProviderInput) itemProviderInput.placeholder = isMaterial ? 'Ej. Proveedor' : 'Ej. Proveedor quimico';
-        if (itemQtyInput) itemQtyInput.placeholder = isMaterial ? 'Ej. 3 Unidades' : 'Ej. 50 ml';
+        
+        // Mostrar/ocultar formularios
+        if (materialForm) materialForm.style.display = isMaterial ? 'grid' : 'none';
+        if (reactivoForm) reactivoForm.style.display = isMaterial ? 'none' : 'grid';
       }
 
       function resetAddForm() {
-        if (itemNameInput) itemNameInput.value = '';
-        if (itemMinQtyInput) itemMinQtyInput.value = '';
-        if (itemProviderInput) itemProviderInput.value = '';
-        if (itemQtyInput) itemQtyInput.value = '';
-        if (itemUserInput) itemUserInput.value = '';
+        // Limpiar formulario Material
+        if (materialNameInput) materialNameInput.value = '';
+        if (materialMinQtyInput) materialMinQtyInput.value = '';
+        if (materialProviderInput) materialProviderInput.value = '';
+        if (materialQtyInput) materialQtyInput.value = '';
+        if (materialUserInput) materialUserInput.value = '';
+        
+        // Limpiar formulario Reactivo
+        if (reactivoNameInput) reactivoNameInput.value = '';
+        if (reactivoUnitMeasureInput) reactivoUnitMeasureInput.value = '';
+        if (reactivoMinQtyInput) reactivoMinQtyInput.value = '';
+        if (reactivoQtyInput) reactivoQtyInput.value = '';
+        if (reactivoUserInput) reactivoUserInput.value = '';
+        if (reactivoProviderInput) reactivoProviderInput.value = '';
         showAddError('');
         setRegisterType('material');
       }
@@ -1264,33 +1316,58 @@
 
       if (registerItemBtn) {
         registerItemBtn.addEventListener('click', function() {
-          const itemName = (itemNameInput ? itemNameInput.value : '').trim();
-          const defaultUnit = selectedRegisterType === 'reactivo' ? 'ml' : 'unidades';
-          const qtyData = parseQuantityInput(itemQtyInput ? itemQtyInput.value : '', defaultUnit);
-          const minData = parseQuantityInput(itemMinQtyInput ? itemMinQtyInput.value : '', defaultUnit);
-          const responsable = (itemUserInput ? itemUserInput.value.trim() : '') || 'Coordinador';
+          const isMaterial = selectedRegisterType === 'material';
+          
+          // Obtener valores según el tipo de registro
+          let itemName, minQtyValue, qtyValue, responsable, provider, unitMeasure;
+          
+          if (isMaterial) {
+            itemName = (materialNameInput ? materialNameInput.value : '').trim();
+            minQtyValue = materialMinQtyInput ? materialMinQtyInput.value : '';
+            qtyValue = materialQtyInput ? materialQtyInput.value : '';
+            responsable = (materialUserInput ? materialUserInput.value.trim() : '') || 'Coordinador';
+            provider = materialProviderInput ? materialProviderInput.value.trim() : '';
+            unitMeasure = null;
+          } else {
+            itemName = (reactivoNameInput ? reactivoNameInput.value : '').trim();
+            minQtyValue = reactivoMinQtyInput ? reactivoMinQtyInput.value : '';
+            qtyValue = reactivoQtyInput ? reactivoQtyInput.value : '';
+            responsable = (reactivoUserInput ? reactivoUserInput.value.trim() : '') || 'Coordinador';
+            provider = reactivoProviderInput ? reactivoProviderInput.value.trim() : '';
+            unitMeasure = (reactivoUnitMeasureInput ? reactivoUnitMeasureInput.value : '').trim();
+          }
+          
+          const defaultUnit = isMaterial ? 'unidades' : 'ml';
+          const qtyData = parseQuantityInput(qtyValue, unitMeasure || defaultUnit);
+          const minData = parseQuantityInput(minQtyValue, unitMeasure || defaultUnit);
 
           if (!itemName || !qtyData) {
             showAddError('*Aviso: Complete nombre y cantidad valida para registrar.');
             return;
           }
 
-          const categoria = selectedRegisterType === 'reactivo' ? 'Reactivo' : 'Material';
+          if (!isMaterial && !unitMeasure) {
+            showAddError('*Aviso: Seleccione una unidad de medida para el reactivo.');
+            return;
+          }
+
+          const categoria = isMaterial ? 'Material' : 'Reactivo';
           const newItem = {
             id: createId(),
             nombre: itemName,
             categoria,
             estado: qtyData.value > 0 ? 'Disponible' : 'Sin stock',
             cantidad: qtyData.value,
-            unidad: qtyData.unit,
+            unidad: isMaterial ? qtyData.unit : unitMeasure,
             cantidadMinima: minData ? minData.value : null,
-            proveedor: itemProviderInput ? itemProviderInput.value.trim() : '',
+            proveedor: provider,
             usuarioResponsable: responsable,
+            unidadMedida: !isMaterial ? unitMeasure : null,
             historial: [
               {
                 movimiento: 'Abastecimiento',
                 cantidad: qtyData.value,
-                unidad: qtyData.unit,
+                unidad: isMaterial ? qtyData.unit : unitMeasure,
                 fecha: getTodayDate(),
                 responsable,
                 laboratorio: 'No aplica'
